@@ -10,9 +10,8 @@ const server = express();
 const metricsRegistry = new Registry();
 const logger = bunyan.createLogger({ name: 'teraslice_exporter' });
 
-const terasliceQueryDelay = 30000;
 const metricPrefix = 'teraslice';
-const standardLabelNames = ['ex_id', 'job_id', 'job_name'];
+const standardLabelNames = ['ex_id', 'job_id', 'job_name', 'teraslice_cluster_url'];
 
 const gaugeWorkersActive = new Gauge({
   name: `${metricPrefix}_workers_active`,
@@ -28,12 +27,68 @@ const gaugeWorkersAvailable = new Gauge({
   registers: [metricsRegistry],
 });
 
+const gaugeWorkersJoined = new Gauge({
+  name: `${metricPrefix}_workers_joined`,
+  help: 'Total number of Teraslice workers that have joined the execution controller for this job.',
+  labelNames: standardLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeWorkersReconnected = new Gauge({
+  name: `${metricPrefix}_workers_reconnected`,
+  help: 'Total number of Teraslice workers that have reconnected to the execution controller for this job.',
+  labelNames: standardLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeWorkersDisconnected = new Gauge({
+  name: `${metricPrefix}_workers_disconnected`,
+  help: 'Total number of Teraslice workers that have disconnected from execution controller for this job.',
+  labelNames: standardLabelNames,
+  registers: [metricsRegistry],
+});
+
+const guageTerasliceMasterInfo = new Gauge({
+  name: `${metricPrefix}_master_info`,
+  help: 'Information about the teraslice master node.',
+  labelNames: ['arch', 'clustering_type', 'name', 'node_version', 'platform', 'teraslice_version'],
+  registers: [metricsRegistry],
+});
+
+const guageNumSlicers = new Gauge({
+  name: `${metricPrefix}_number_of_slicers`,
+  help: 'Number of execution controllers running for this execution.',
+  labelNames: standardLabelNames,
+  registers: [metricsRegistry],
+});
+
+const guageControllerQueryDuration = new Gauge({
+  name: `${metricPrefix}_controller_query_duration`,
+  help: 'Total time in ms to query the Teraslice controller endpoint.',
+  labelNames: ['teraslice_cluster_url'],
+  registers: [metricsRegistry],
+});
+
 // The following Guages should be Counters by my reconing, but as far as
 // prom-client is concerned, this usage is fine:
 //   https://github.com/siimon/prom-client/issues/192
 const guageSlicesProcessed = new Gauge({
   name: `${metricPrefix}_slices_processed`,
   help: 'Number of slices processed.',
+  labelNames: standardLabelNames,
+  registers: [metricsRegistry],
+});
+
+const guageSlicesFailed = new Gauge({
+  name: `${metricPrefix}_slices_failed`,
+  help: 'Number of slices failed.',
+  labelNames: standardLabelNames,
+  registers: [metricsRegistry],
+});
+
+const guageSlicesQueued = new Gauge({
+  name: `${metricPrefix}_slices_queued`,
+  help: 'Number of slices queued for processing.',
   labelNames: standardLabelNames,
   registers: [metricsRegistry],
 });
@@ -65,83 +120,123 @@ const guageSlicesProcessed = new Gauge({
  *
  * @param controller
  */
-function parseController(controller:any) {
-  // p(controller);
-
+function parseController(controller:any, url: string) {
   const standardLabels = {
     ex_id: controller.ex_id,
     job_id: controller.job_id,
     job_name: controller.name,
+    teraslice_cluster_url: url,
   };
 
   gaugeWorkersActive.set(standardLabels, controller.workers_active);
   gaugeWorkersAvailable.set(standardLabels, controller.workers_available);
+  gaugeWorkersJoined.set(standardLabels, controller.workers_joined);
+  gaugeWorkersReconnected.set(standardLabels, controller.workers_reconnected);
+  gaugeWorkersDisconnected.set(standardLabels, controller.workers_disconnected);
+
   guageSlicesProcessed.set(standardLabels, controller.processed);
+  guageSlicesFailed.set(standardLabels, controller.failed);
+  guageSlicesQueued.set(standardLabels, controller.queued);
+
+  guageNumSlicers.set(standardLabels, controller.slicers);
 }
 
 async function getTerasliceClusterState(baseUrl: URL) {
   const url = new URL('/v1/cluster/controllers', baseUrl);
   let response;
   try {
+    logger.debug(`Getting ${url}`);
     response = await got(url);
   } catch (error) {
-    logger.error(error);
+    logger.error(`Error getting ${url}: ${error}`);
   }
 
   if (response && response.statusCode === 200) {
-    logger.debug(response.statusCode);
-
     const controllers = JSON.parse(response.body);
 
     // eslint-disable-next-line no-restricted-syntax
     for (const controller of controllers) {
-      parseController(controller);
+      parseController(controller, baseUrl.toString());
     }
   } else if (response) {
     logger.error(`Error getting ${url}: ${response.statusCode}`);
   }
 
-  // p(response.timings)
+  logger.debug(JSON.stringify(response?.timings));
+  guageControllerQueryDuration.set(
+    { teraslice_cluster_url: baseUrl.toString() },
+    response?.timings.phases.total,
+  );
 }
 
 async function getTerasliceClusterInfo(baseUrl:URL) {
-  let response;
   let info;
+  let response : {
+    body: {
+      arch: string,
+      // eslint-disable-next-line camelcase
+      clustering_type: string,
+      name: string,
+      // eslint-disable-next-line camelcase
+      node_version: string,
+      platform: string,
+      // eslint-disable-next-line camelcase
+      teraslice_version: string
+    },
+    statusCode: number
+  };
+
   try {
     response = await got(baseUrl, { responseType: 'json' });
+    if (response && response.statusCode === 200 && response.body) {
+      info = response.body;
+      guageTerasliceMasterInfo.set(info, 1);
+    } else if (response) {
+      logger.error(`Error getting ${baseUrl}: ${response.statusCode}`);
+    }
   } catch (error) {
-    logger.error(error);
+    logger.error(`Error getting ${baseUrl}: ${error}`);
   }
-
-  if (response && response.statusCode === 200 && response.body) {
-    // p(response.body);
-    info = response.body;
-  } else if (response) {
-    logger.error(`Error getting ${baseUrl}: ${response.statusCode}`);
-  }
-  return info;
 }
 
 async function updateTerasliceInfo(url:URL) {
-  const clusterInfo = await getTerasliceClusterInfo(url);
-  // console.log(clusterInfo);
+  await getTerasliceClusterInfo(url);
   await getTerasliceClusterState(url);
 }
 
-function main() {
-  const { DEBUG, TERASLICE_URL } = process.env;
+declare let process : {
+  env: {
+    DEBUG: string,
+    PORT: number,
+    TERASLICE_URL: string
+    TERASLICE_QUERY_DELAY: number
+  }
+};
 
-  server.get('/metrics', (req, res) => {
+function main() {
+  let baseUrl: URL;
+  const metricsEndpoint = '/metrics';
+
+  if (process.env.TERASLICE_URL) {
+    baseUrl = new URL(process.env.TERASLICE_URL);
+  } else {
+    throw new Error('The TERASLICE_URL environment variable must be a valid URL to the root of your teraslice instance.');
+  }
+  const port = process.env.PORT || 3000;
+  const terasliceQueryDelay = process.env.TERASLICE_QUERY_DELAY || 30000; // ms
+
+  server.get(metricsEndpoint, (req, res) => {
     res.set('Content-Type', metricsRegistry.contentType);
     res.end(metricsRegistry.metrics());
   });
 
-  if (DEBUG) {
+  server.get('/', (req, res) => {
+    res.send(`See the '${metricsEndpoint}' endpoint for the teraslice exporter.`);
+  });
+
+  if (process.env.DEBUG) {
     logger.level('debug');
   }
-  logger.debug('DEBUG');
-
-  const baseUrl = new URL(TERASLICE_URL);
 
   logger.info(`Getting intial Teraslice Cluster Information from ${baseUrl}`);
   updateTerasliceInfo(baseUrl);
@@ -151,8 +246,7 @@ function main() {
     updateTerasliceInfo(baseUrl);
   }, terasliceQueryDelay);
 
-  const port = process.env.PORT || 3000;
-  logger.info(`Server listening to ${port}, metrics exposed on /metrics endpoint`);
+  logger.info(`HTTP server listening to ${port}, metrics exposed on ${metricsEndpoint} endpoint`);
   server.listen(port);
 }
 
