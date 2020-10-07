@@ -13,6 +13,27 @@ const logger = bunyan.createLogger({ name: 'teraslice_exporter' });
 const metricPrefix = 'teraslice';
 const standardLabelNames = ['ex_id', 'job_id', 'job_name', 'teraslice_cluster_url'];
 
+interface TerasliceInfo {
+  arch: string,
+  // eslint-disable-next-line camelcase
+  clustering_type: string,
+  name: string,
+  // eslint-disable-next-line camelcase
+  node_version: string,
+  platform: string,
+  // eslint-disable-next-line camelcase
+  teraslice_version: string
+}
+
+declare let process : {
+  env: {
+    DEBUG: string,
+    PORT: number,
+    TERASLICE_URL: string
+    TERASLICE_QUERY_DELAY: number
+  }
+};
+
 const gaugeWorkersActive = new Gauge({
   name: `${metricPrefix}_workers_active`,
   help: 'Number of Teraslice workers actively processing slices.',
@@ -141,77 +162,62 @@ function parseController(controller:any, url: string) {
   guageNumSlicers.set(standardLabels, controller.slicers);
 }
 
-async function getTerasliceClusterState(baseUrl: URL) {
-  const url = new URL('/v1/cluster/controllers', baseUrl);
-  let response;
-  try {
-    logger.debug(`Getting ${url}`);
-    response = await got(url);
-  } catch (error) {
-    logger.error(`Error getting ${url}: ${error}`);
-  }
-
-  if (response && response.statusCode === 200) {
-    const controllers = JSON.parse(response.body);
-
-    // eslint-disable-next-line no-restricted-syntax
-    for (const controller of controllers) {
-      parseController(controller, baseUrl.toString());
-    }
-  } else if (response) {
-    logger.error(`Error getting ${url}: ${response.statusCode}`);
-  }
-
-  logger.debug(JSON.stringify(response?.timings));
-  guageControllerQueryDuration.set(
-    { teraslice_cluster_url: baseUrl.toString() },
-    response?.timings.phases.total,
-  );
-}
-
-async function getTerasliceClusterInfo(baseUrl:URL) {
-  let info;
+async function getTerasliceApi(baseUrl:URL, path:string) {
+  const url = new URL(path, baseUrl);
+  let r: {
+    data: any,
+    queryDuration: number
+    };
   let response : {
-    body: {
-      arch: string,
-      // eslint-disable-next-line camelcase
-      clustering_type: string,
-      name: string,
-      // eslint-disable-next-line camelcase
-      node_version: string,
-      platform: string,
-      // eslint-disable-next-line camelcase
-      teraslice_version: string
-    },
-    statusCode: number
+    body: any,
+    statusCode: number,
+    timings: any
   };
 
   try {
-    response = await got(baseUrl, { responseType: 'json' });
+    response = await got(url, { responseType: 'json' });
     if (response && response.statusCode === 200 && response.body) {
-      info = response.body;
-      guageTerasliceMasterInfo.set(info, 1);
-    } else if (response) {
-      logger.error(`Error getting ${baseUrl}: ${response.statusCode}`);
+      r = {
+        data: response.body,
+        queryDuration: response.timings.phases.total,
+      };
+    } else {
+      throw new Error(`Error getting ${url}: ${response.statusCode}`);
     }
   } catch (error) {
-    logger.error(`Error getting ${baseUrl}: ${error}`);
+    throw new Error(`Error getting ${url}: ${error}`);
   }
+  return r;
 }
 
+// I think I've been doing this sort of thing wrong in the past.
+// https://stackoverflow.com/questions/45285129/any-difference-between-await-promise-all-and-multiple-await
 async function updateTerasliceInfo(url:URL) {
-  await getTerasliceClusterInfo(url);
-  await getTerasliceClusterState(url);
-}
+  const querySize = 200;
+  // eslint-disable-next-line func-names
+  const run = async function () {
+    const [info, jobs, controllers] = await Promise.all([
+      getTerasliceApi(url, '/'),
+      getTerasliceApi(url, `/v1/jobs?size=${querySize}`),
+      getTerasliceApi(url, '/v1/cluster/controllers'),
+    ]);
+    // logger.info(JSON.stringify(info));
+    guageTerasliceMasterInfo.set(info.data, 1);
+    logger.info(`Number Jobs: ${jobs.data.length}`);
+    logger.info(`Number of Controllers: ${controllers.data.length}`);
 
-declare let process : {
-  env: {
-    DEBUG: string,
-    PORT: number,
-    TERASLICE_URL: string
-    TERASLICE_QUERY_DELAY: number
-  }
-};
+    // FIXME: I should rethink this warning
+    // eslint-disable-next-line no-restricted-syntax
+    for (const controller of controllers.data) {
+      parseController(controller, url.toString());
+    }
+
+    guageControllerQueryDuration.set({ teraslice_cluster_url: '/' }, info.queryDuration);
+    guageControllerQueryDuration.set({ teraslice_cluster_url: `/v1/jobs?size=${querySize}` }, jobs.queryDuration);
+    guageControllerQueryDuration.set({ teraslice_cluster_url: '/v1/cluster/controllers' }, controllers.queryDuration);
+  };
+  run().catch((err) => { logger.error('Error updating Teraslice Info', err); });
+}
 
 function main() {
   let baseUrl: URL;
