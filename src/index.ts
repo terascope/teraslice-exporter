@@ -1,9 +1,10 @@
 import { URL } from 'url';
 
 import { Gauge, Registry } from 'prom-client';
-import got from 'got';
 import express from 'express';
 import bunyan from 'bunyan';
+
+import TerasliceStats from './teraslice-stats';
 
 const server = express();
 
@@ -12,18 +13,6 @@ const logger = bunyan.createLogger({ name: 'teraslice_exporter' });
 
 const metricPrefix = 'teraslice';
 const standardLabelNames = ['ex_id', 'job_id', 'job_name', 'teraslice_cluster_url'];
-
-interface TerasliceInfo {
-  arch: string,
-  // eslint-disable-next-line camelcase
-  clustering_type: string,
-  name: string,
-  // eslint-disable-next-line camelcase
-  node_version: string,
-  platform: string,
-  // eslint-disable-next-line camelcase
-  teraslice_version: string
-}
 
 declare let process : {
   env: {
@@ -83,6 +72,12 @@ const guageNumSlicers = new Gauge({
   registers: [metricsRegistry],
 });
 
+// FIXME: Missing labels on this one:
+// # HELP teraslice_controller_query_duration Total time in ms to query the Teraslice controller endpoint.
+// # TYPE teraslice_controller_query_duration gauge
+// teraslice_controller_query_duration{teraslice_cluster_url="/"} 293
+// teraslice_controller_query_duration{teraslice_cluster_url="/v1/jobs"} 674
+// teraslice_controller_query_duration{teraslice_cluster_url="/v1/cluster/controllers"} 774
 const guageControllerQueryDuration = new Gauge({
   name: `${metricPrefix}_controller_query_duration`,
   help: 'Total time in ms to query the Teraslice controller endpoint.',
@@ -162,69 +157,36 @@ function parseController(controller:any, url: string) {
   guageNumSlicers.set(standardLabels, controller.slicers);
 }
 
-async function getTerasliceApi(baseUrl:URL, path:string) {
-  const url = new URL(path, baseUrl);
-  let r: {
-    data: any,
-    queryDuration: number
-    };
-  let response : {
-    body: any,
-    statusCode: number,
-    timings: any
-  };
+function updateTerasliceStats(terasliceStats: TerasliceStats) {
+  guageTerasliceMasterInfo.set(terasliceStats.info, 1);
+  logger.debug(`Number Jobs: ${terasliceStats.jobs.length}`);
+  logger.debug(`Number of Controllers: ${terasliceStats.controllers.length}`);
 
-  try {
-    response = await got(url, { responseType: 'json' });
-    if (response && response.statusCode === 200 && response.body) {
-      r = {
-        data: response.body,
-        queryDuration: response.timings.phases.total,
-      };
-    } else {
-      throw new Error(`Error getting ${url}: ${response.statusCode}`);
-    }
-  } catch (error) {
-    throw new Error(`Error getting ${url}: ${error}`);
+  // FIXME: I should rethink this warning
+  // eslint-disable-next-line no-restricted-syntax
+  for (const controller of terasliceStats.controllers) {
+    parseController(controller, terasliceStats.baseUrl.toString());
   }
-  return r;
+
+  guageControllerQueryDuration.set(
+    { teraslice_cluster_url: '/' }, terasliceStats.queryDuration.info,
+  );
+  guageControllerQueryDuration.set(
+    { teraslice_cluster_url: '/v1/jobs' }, terasliceStats.queryDuration.jobs,
+  );
+  guageControllerQueryDuration.set(
+    { teraslice_cluster_url: '/v1/cluster/controllers' }, terasliceStats.queryDuration.controllers,
+  );
 }
 
-// I think I've been doing this sort of thing wrong in the past.
-// https://stackoverflow.com/questions/45285129/any-difference-between-await-promise-all-and-multiple-await
-async function updateTerasliceInfo(url:URL) {
-  const querySize = 200;
-  // eslint-disable-next-line func-names
-  const run = async function () {
-    const [info, jobs, controllers] = await Promise.all([
-      getTerasliceApi(url, '/'),
-      getTerasliceApi(url, `/v1/jobs?size=${querySize}`),
-      getTerasliceApi(url, '/v1/cluster/controllers'),
-    ]);
-    // logger.info(JSON.stringify(info));
-    guageTerasliceMasterInfo.set(info.data, 1);
-    logger.info(`Number Jobs: ${jobs.data.length}`);
-    logger.info(`Number of Controllers: ${controllers.data.length}`);
-
-    // FIXME: I should rethink this warning
-    // eslint-disable-next-line no-restricted-syntax
-    for (const controller of controllers.data) {
-      parseController(controller, url.toString());
-    }
-
-    guageControllerQueryDuration.set({ teraslice_cluster_url: '/' }, info.queryDuration);
-    guageControllerQueryDuration.set({ teraslice_cluster_url: `/v1/jobs?size=${querySize}` }, jobs.queryDuration);
-    guageControllerQueryDuration.set({ teraslice_cluster_url: '/v1/cluster/controllers' }, controllers.queryDuration);
-  };
-  run().catch((err) => { logger.error('Error updating Teraslice Info', err); });
-}
-
-function main() {
-  let baseUrl: URL;
+async function main() {
+  let baseUrl: string;
   const metricsEndpoint = '/metrics';
 
   if (process.env.TERASLICE_URL) {
-    baseUrl = new URL(process.env.TERASLICE_URL);
+    // I instantiate a URL, then immediately call toString() just to get the
+    // URL validation but keep a string type
+    baseUrl = new URL(process.env.TERASLICE_URL).toString();
   } else {
     throw new Error('The TERASLICE_URL environment variable must be a valid URL to the root of your teraslice instance.');
   }
@@ -240,16 +202,16 @@ function main() {
     res.send(`See the '${metricsEndpoint}' endpoint for the teraslice exporter.`);
   });
 
-  if (process.env.DEBUG) {
-    logger.level('debug');
-  }
+  if (process.env.DEBUG) logger.level('debug');
 
-  logger.info(`Getting intial Teraslice Cluster Information from ${baseUrl}`);
-  updateTerasliceInfo(baseUrl);
+  const terasliceStats = new TerasliceStats(baseUrl);
+  await terasliceStats.update();
+  updateTerasliceStats(terasliceStats);
 
-  setInterval(() => {
+  setInterval(async () => {
     logger.debug(`Updating Teraslice Cluster Information from ${baseUrl}`);
-    updateTerasliceInfo(baseUrl);
+    await terasliceStats.update();
+    updateTerasliceStats(terasliceStats);
   }, terasliceQueryDelay);
 
   logger.info(`HTTP server listening to ${port}, metrics exposed on ${metricsEndpoint} endpoint`);
