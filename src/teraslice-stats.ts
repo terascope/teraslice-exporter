@@ -58,7 +58,7 @@ export default class TerasliceStats implements TerasliceStatsInterface {
     this.controllers = [];
     this.executions = [];
     this.jobs = [];
-    // FIXME: should I use something other than 0 here?
+
     this.queryDuration = {
       controllers: 0,
       executions: 0,
@@ -100,6 +100,7 @@ export default class TerasliceStats implements TerasliceStatsInterface {
     const time = process.hrtime();
     this.executions = [];
     const maxConcurrency = 10;
+    const queryDelay = 25;
 
     for (let i = 0; i < this.controllers.length; i += maxConcurrency) {
       const controllersSlice = this.controllers.slice(i, i + maxConcurrency);
@@ -113,17 +114,13 @@ export default class TerasliceStats implements TerasliceStatsInterface {
       this.executions.push.apply(this.executions, r.map((x) => x.data));
 
       // eslint-disable-next-line no-await-in-loop
-      await pDelay(25);
+      await pDelay(queryDelay);
     }
 
     const NS_PER_SEC = 1e9;
     const diff = process.hrtime(time);
     this.queryDuration.executions = Math.round((diff[0] * NS_PER_SEC + diff[1]) / 1e6);
   }
-
-  // FIXME: I don't think /jobs is even relevant here ... what I should really
-  // do is get the ex_ids from the controllers, and then go get the ex for each
-  // one of those.  Jobs are mostly irrelevant in this context.
 
   // I think I've been doing this sort of thing wrong in the past.
   // https://stackoverflow.com/questions/45285129/any-difference-between-await-promise-all-and-multiple-await
