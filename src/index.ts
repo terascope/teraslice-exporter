@@ -12,7 +12,16 @@ const metricsRegistry = new Registry();
 const logger = bunyan.createLogger({ name: 'teraslice_exporter' });
 
 const metricPrefix = 'teraslice';
-const standardLabelNames = ['ex_id', 'job_id', 'job_name', 'teraslice_cluster_url'];
+const globalLabelNames = [
+  'url',
+  'name',
+];
+const exLabelNames = [
+  'ex_id',
+  'job_id',
+  'job_name',
+  ...globalLabelNames,
+];
 
 declare let process : {
   env: {
@@ -26,62 +35,64 @@ declare let process : {
 const gaugeWorkersActive = new Gauge({
   name: `${metricPrefix}_workers_active`,
   help: 'Number of Teraslice workers actively processing slices.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersAvailable = new Gauge({
   name: `${metricPrefix}_workers_available`,
   help: 'Number of Teraslice workers running and waiting for work.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersJoined = new Gauge({
   name: `${metricPrefix}_workers_joined`,
   help: 'Total number of Teraslice workers that have joined the execution controller for this job.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersReconnected = new Gauge({
   name: `${metricPrefix}_workers_reconnected`,
   help: 'Total number of Teraslice workers that have reconnected to the execution controller for this job.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersDisconnected = new Gauge({
   name: `${metricPrefix}_workers_disconnected`,
   help: 'Total number of Teraslice workers that have disconnected from execution controller for this job.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const guageTerasliceMasterInfo = new Gauge({
   name: `${metricPrefix}_master_info`,
   help: 'Information about the teraslice master node.',
-  labelNames: ['arch', 'clustering_type', 'name', 'node_version', 'platform', 'teraslice_version'],
+  labelNames: [
+    'arch',
+    'clustering_type',
+    'name',
+    'node_version',
+    'platform',
+    'teraslice_version',
+    ...globalLabelNames,
+  ],
   registers: [metricsRegistry],
 });
 
 const guageNumSlicers = new Gauge({
   name: `${metricPrefix}_number_of_slicers`,
   help: 'Number of execution controllers running for this execution.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
-// FIXME: Missing labels on this one:
-// # HELP teraslice_controller_query_duration Total time in ms to query the Teraslice controller endpoint.
-// # TYPE teraslice_controller_query_duration gauge
-// teraslice_controller_query_duration{teraslice_cluster_url="/"} 293
-// teraslice_controller_query_duration{teraslice_cluster_url="/v1/jobs"} 674
-// teraslice_controller_query_duration{teraslice_cluster_url="/v1/cluster/controllers"} 774
-const guageControllerQueryDuration = new Gauge({
-  name: `${metricPrefix}_controller_query_duration`,
-  help: 'Total time in ms to query the Teraslice controller endpoint.',
-  labelNames: ['teraslice_cluster_url'],
+const guageQueryDuration = new Gauge({
+  name: `${metricPrefix}_query_duration`,
+  help: 'Total time to complete the named query, in ms.',
+  labelNames: ['query_name', ...globalLabelNames],
   registers: [metricsRegistry],
 });
 
@@ -91,21 +102,21 @@ const guageControllerQueryDuration = new Gauge({
 const guageSlicesProcessed = new Gauge({
   name: `${metricPrefix}_slices_processed`,
   help: 'Number of slices processed.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const guageSlicesFailed = new Gauge({
   name: `${metricPrefix}_slices_failed`,
   help: 'Number of slices failed.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const guageSlicesQueued = new Gauge({
   name: `${metricPrefix}_slices_queued`,
   help: 'Number of slices queued for processing.',
-  labelNames: standardLabelNames,
+  labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
@@ -136,46 +147,64 @@ const guageSlicesQueued = new Gauge({
  *
  * @param controller
  */
-function parseController(controller:any, url: string) {
-  const standardLabels = {
+function parseController(controller:any, labels:any) {
+  const controllerLabels = {
     ex_id: controller.ex_id,
     job_id: controller.job_id,
     job_name: controller.name,
-    teraslice_cluster_url: url,
+    ...labels,
   };
 
-  gaugeWorkersActive.set(standardLabels, controller.workers_active);
-  gaugeWorkersAvailable.set(standardLabels, controller.workers_available);
-  gaugeWorkersJoined.set(standardLabels, controller.workers_joined);
-  gaugeWorkersReconnected.set(standardLabels, controller.workers_reconnected);
-  gaugeWorkersDisconnected.set(standardLabels, controller.workers_disconnected);
+  gaugeWorkersActive.set(controllerLabels, controller.workers_active);
+  gaugeWorkersAvailable.set(controllerLabels, controller.workers_available);
+  gaugeWorkersJoined.set(controllerLabels, controller.workers_joined);
+  gaugeWorkersReconnected.set(controllerLabels, controller.workers_reconnected);
+  gaugeWorkersDisconnected.set(controllerLabels, controller.workers_disconnected);
 
-  guageSlicesProcessed.set(standardLabels, controller.processed);
-  guageSlicesFailed.set(standardLabels, controller.failed);
-  guageSlicesQueued.set(standardLabels, controller.queued);
+  guageSlicesProcessed.set(controllerLabels, controller.processed);
+  guageSlicesFailed.set(controllerLabels, controller.failed);
+  guageSlicesQueued.set(controllerLabels, controller.queued);
 
-  guageNumSlicers.set(standardLabels, controller.slicers);
+  guageNumSlicers.set(controllerLabels, controller.slicers);
 }
 
-function updateTerasliceStats(terasliceStats: TerasliceStats) {
-  guageTerasliceMasterInfo.set(terasliceStats.info, 1);
-  logger.debug(`Number Jobs: ${terasliceStats.jobs.length}`);
-  logger.debug(`Number of Controllers: ${terasliceStats.controllers.length}`);
-
+function generateControllerStats(terasliceStats:TerasliceStats, labels:any) {
   // FIXME: I should rethink this warning
   // eslint-disable-next-line no-restricted-syntax
   for (const controller of terasliceStats.controllers) {
-    parseController(controller, terasliceStats.baseUrl.toString());
+    parseController(controller, labels);
   }
+}
 
-  guageControllerQueryDuration.set(
-    { teraslice_cluster_url: '/' }, terasliceStats.queryDuration.info,
+function updateTerasliceMetrics(terasliceStats: TerasliceStats) {
+  const globalLabels = {
+    url: terasliceStats.baseUrl.toString(),
+    name: terasliceStats.info.name,
+  };
+  // NOTE: This set of labels expands out to including 'name' twice, right now
+  // they reduce to a single 'name' label ... I could end up regretting this.
+  guageTerasliceMasterInfo.set(
+    { ...terasliceStats.info, ...globalLabels },
+    1,
   );
-  guageControllerQueryDuration.set(
-    { teraslice_cluster_url: '/v1/jobs' }, terasliceStats.queryDuration.jobs,
+
+  generateControllerStats(terasliceStats, globalLabels);
+
+  guageQueryDuration.set(
+    { query_name: 'info', ...globalLabels },
+    terasliceStats.queryDuration.info,
   );
-  guageControllerQueryDuration.set(
-    { teraslice_cluster_url: '/v1/cluster/controllers' }, terasliceStats.queryDuration.controllers,
+  guageQueryDuration.set(
+    { query_name: 'jobs', ...globalLabels },
+    terasliceStats.queryDuration.jobs,
+  );
+  guageQueryDuration.set(
+    { query_name: 'controllers', ...globalLabels },
+    terasliceStats.queryDuration.controllers,
+  );
+  guageQueryDuration.set(
+    { query_name: 'executions', ...globalLabels },
+    terasliceStats.queryDuration.executions,
   );
 }
 
@@ -206,12 +235,23 @@ async function main() {
 
   const terasliceStats = new TerasliceStats(baseUrl);
   await terasliceStats.update();
-  updateTerasliceStats(terasliceStats);
+  updateTerasliceMetrics(terasliceStats);
+
+  logger.debug(`executions: ${JSON.stringify(terasliceStats.executions.slice(0, 2), null, 2)}`);
+  logger.debug(`controllers: ${JSON.stringify(terasliceStats.controllers.slice(0, 2), null, 2)}`);
 
   setInterval(async () => {
     logger.debug(`Updating Teraslice Cluster Information from ${baseUrl}`);
     await terasliceStats.update();
-    updateTerasliceStats(terasliceStats);
+    updateTerasliceMetrics(terasliceStats);
+
+    logger.debug(`queryDurations: ${JSON.stringify(terasliceStats.queryDuration)}`);
+    logger.debug(`datasetSizes: ${JSON.stringify({
+      info: terasliceStats.info.length,
+      controllers: terasliceStats.controllers.length,
+      executions: terasliceStats.executions.length,
+      jobs: terasliceStats.jobs.length,
+    })}`);
   }, terasliceQueryDelay);
 
   logger.info(`HTTP server listening to ${port}, metrics exposed on ${metricsEndpoint} endpoint`);
