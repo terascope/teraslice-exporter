@@ -108,14 +108,17 @@ export default class TerasliceStats implements TerasliceStatsInterface {
       const r = await Promise.all(
         controllersSlice.map((x) => this.getTerasliceApi(`/v1/ex/${x.ex_id}`)),
       );
-      this.executions = this.executions.concat(r.map((x) => x.data));
+
+      // eslint-disable-next-line prefer-spread
+      this.executions.push.apply(this.executions, r.map((x) => x.data));
+
       // eslint-disable-next-line no-await-in-loop
       await pDelay(25);
     }
 
     const NS_PER_SEC = 1e9;
     const diff = process.hrtime(time);
-    this.queryDuration.executions = (diff[0] * NS_PER_SEC + diff[1]) / 1e6;
+    this.queryDuration.executions = Math.round((diff[0] * NS_PER_SEC + diff[1]) / 1e6);
   }
 
   // FIXME: I don't think /jobs is even relevant here ... what I should really
