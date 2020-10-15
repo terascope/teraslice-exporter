@@ -67,7 +67,7 @@ const gaugeWorkersDisconnected = new Gauge({
   registers: [metricsRegistry],
 });
 
-const guageTerasliceMasterInfo = new Gauge({
+const gaugeTerasliceMasterInfo = new Gauge({
   name: `${metricPrefix}_master_info`,
   help: 'Information about the teraslice master node.',
   labelNames: [
@@ -82,38 +82,68 @@ const guageTerasliceMasterInfo = new Gauge({
   registers: [metricsRegistry],
 });
 
-const guageNumSlicers = new Gauge({
+const gaugeNumSlicers = new Gauge({
   name: `${metricPrefix}_number_of_slicers`,
   help: 'Number of execution controllers running for this execution.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
-const guageQueryDuration = new Gauge({
+const gaugeQueryDuration = new Gauge({
   name: `${metricPrefix}_query_duration`,
   help: 'Total time to complete the named query, in ms.',
   labelNames: ['query_name', ...globalLabelNames],
   registers: [metricsRegistry],
 });
 
-// The following Guages should be Counters by my reconing, but as far as
+// Execution Related Metrics
+
+const gaugeCpuLimit = new Gauge({
+  name: `${metricPrefix}_ex_cpu_limit`,
+  help: 'CPU core limit for a Teraslice worker container.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeCpuRequest = new Gauge({
+  name: `${metricPrefix}_ex_cpu_request`,
+  help: 'Requested number of CPU cores for a Teraslice worker container.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeMemoryLimit = new Gauge({
+  name: `${metricPrefix}_ex_memory_limit`,
+  help: 'Memory limit for Teraslice a worker container.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeMemoryRequest = new Gauge({
+  name: `${metricPrefix}_ex_memory_request`,
+  help: 'Requested amount of memory for a Teraslice worker container.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+// The following gauges should be Counters by my reconing, but as far as
 // prom-client is concerned, this usage is fine:
 //   https://github.com/siimon/prom-client/issues/192
-const guageSlicesProcessed = new Gauge({
+const gaugeSlicesProcessed = new Gauge({
   name: `${metricPrefix}_slices_processed`,
   help: 'Number of slices processed.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
-const guageSlicesFailed = new Gauge({
+const gaugeSlicesFailed = new Gauge({
   name: `${metricPrefix}_slices_failed`,
   help: 'Number of slices failed.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
-const guageSlicesQueued = new Gauge({
+const gaugeSlicesQueued = new Gauge({
   name: `${metricPrefix}_slices_queued`,
   help: 'Number of slices queued for processing.',
   labelNames: exLabelNames,
@@ -125,9 +155,9 @@ const guageSlicesQueued = new Gauge({
  * metricsRegistry for a single execution.
  *
  *    {
- *       "ex_id": "5ba1da6a-0ba2-49f4-92c3-d436ba510e59",
- *       "job_id": "7e6dfa3c-6665-455d-9d52-f11bd32ad18a",
- *       "name": "my_job_name",
+ *       "ex_id": "5ba1da6a-0ba2-49f4-92c3-d436ba510111",
+ *       "job_id": "7e6dfa3c-6665-455d-9d52-f11bd32ad111",
+ *       "name": "my-job-name",
  *       "workers_available": 0,
  *       "workers_active": 6,
  *       "workers_joined": 6,
@@ -161,11 +191,81 @@ function parseController(controller:any, labels:any) {
   gaugeWorkersReconnected.set(controllerLabels, controller.workers_reconnected);
   gaugeWorkersDisconnected.set(controllerLabels, controller.workers_disconnected);
 
-  guageSlicesProcessed.set(controllerLabels, controller.processed);
-  guageSlicesFailed.set(controllerLabels, controller.failed);
-  guageSlicesQueued.set(controllerLabels, controller.queued);
+  gaugeSlicesProcessed.set(controllerLabels, controller.processed);
+  gaugeSlicesFailed.set(controllerLabels, controller.failed);
+  gaugeSlicesQueued.set(controllerLabels, controller.queued);
 
-  guageNumSlicers.set(controllerLabels, controller.slicers);
+  gaugeNumSlicers.set(controllerLabels, controller.slicers);
+}
+
+/**
+ *    {
+        "analytics": true,
+        "performance_metrics": false,
+        "assets": [
+          "19b4f13148f64bc5a3fcfc53f96a5d646141a111",
+          "b652a2d09f71e68dd0ca15f6b5a14136b181e111"
+        ],
+        "autorecover": false,
+        "lifecycle": "persistent",
+        "max_retries": 3,
+        "name": "my-job-name",
+        "operations": [
+          {
+            ...
+          },
+          ...
+        ],
+        "apis": [],
+        "probation_window": 300000,
+        "slicers": 1,
+        "workers": 6,
+        "labels": null,
+        "env_vars": {},
+        "targets": [
+          {
+            "key": "failure-domain.beta.kubernetes.io/zone",
+            "value": "west"
+          }
+        ],
+        "cpu": 1.5,
+        "memory": 3221225472,
+        "volumes": [],
+        "job_id": "7e6dfa3c-6665-455d-9d52-f11bd32ad111",
+        "ex_id": "5ba1da6a-0ba2-49f4-92c3-d436ba510111",
+        "metadata": {},
+        "slicer_port": 45680,
+        "slicer_hostname": "10.32.97.23",
+        "_context": "ex",
+        "_created": "2020-07-09T21:30:34.537Z",
+        "_updated": "2020-07-09T21:30:42.745Z",
+        "_status": "running",
+        "_has_errors": false,
+        "_slicer_stats": {},
+        "_failureReason": ""
+      }
+ * @param execution
+ * @param labels
+ */
+function parseExecution(execution:any, labels:any) {
+  const executionLabels = {
+    ex_id: execution.ex_id,
+    job_id: execution.job_id,
+    job_name: execution.name,
+    ...labels,
+  };
+
+  // NOTE: Optional settings that are undefined are just excluded with a
+  // conditional below.
+
+  // TODO: At some point workers will have different CPU Limits and Requests,
+  // https://github.com/terascope/teraslice/issues/2202
+  // for now, these are set to the same thing, but I split them since I know a
+  // change is coming.
+  if (execution.cpu) gaugeCpuRequest.set(executionLabels, execution.cpu);
+  if (execution.cpu) gaugeCpuLimit.set(executionLabels, execution.cpu);
+  if (execution.memory) gaugeMemoryRequest.set(executionLabels, execution.memory);
+  if (execution.memory) gaugeMemoryLimit.set(executionLabels, execution.memory);
 }
 
 function generateControllerStats(terasliceStats:TerasliceStats, labels:any) {
@@ -176,6 +276,14 @@ function generateControllerStats(terasliceStats:TerasliceStats, labels:any) {
   }
 }
 
+function generateExecutionStats(terasliceStats:TerasliceStats, labels:any) {
+  // FIXME: I should rethink this warning
+  // eslint-disable-next-line no-restricted-syntax
+  for (const execution of terasliceStats.executions) {
+    parseExecution(execution, labels);
+  }
+}
+
 function updateTerasliceMetrics(terasliceStats: TerasliceStats) {
   const globalLabels = {
     url: terasliceStats.baseUrl.toString(),
@@ -183,26 +291,27 @@ function updateTerasliceMetrics(terasliceStats: TerasliceStats) {
   };
   // NOTE: This set of labels expands out to including 'name' twice, right now
   // they reduce to a single 'name' label ... I could end up regretting this.
-  guageTerasliceMasterInfo.set(
+  gaugeTerasliceMasterInfo.set(
     { ...terasliceStats.info, ...globalLabels },
     1,
   );
 
   generateControllerStats(terasliceStats, globalLabels);
+  generateExecutionStats(terasliceStats, globalLabels);
 
-  guageQueryDuration.set(
+  gaugeQueryDuration.set(
     { query_name: 'info', ...globalLabels },
     terasliceStats.queryDuration.info,
   );
-  guageQueryDuration.set(
+  gaugeQueryDuration.set(
     { query_name: 'jobs', ...globalLabels },
     terasliceStats.queryDuration.jobs,
   );
-  guageQueryDuration.set(
+  gaugeQueryDuration.set(
     { query_name: 'controllers', ...globalLabels },
     terasliceStats.queryDuration.controllers,
   );
-  guageQueryDuration.set(
+  gaugeQueryDuration.set(
     { query_name: 'executions', ...globalLabels },
     terasliceStats.queryDuration.executions,
   );
