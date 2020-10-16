@@ -33,35 +33,35 @@ declare let process : {
 };
 
 const gaugeWorkersActive = new Gauge({
-  name: `${metricPrefix}_workers_active`,
+  name: `${metricPrefix}_controller_workers_active`,
   help: 'Number of Teraslice workers actively processing slices.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersAvailable = new Gauge({
-  name: `${metricPrefix}_workers_available`,
+  name: `${metricPrefix}_controller_workers_available`,
   help: 'Number of Teraslice workers running and waiting for work.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersJoined = new Gauge({
-  name: `${metricPrefix}_workers_joined`,
+  name: `${metricPrefix}_controller_workers_joined`,
   help: 'Total number of Teraslice workers that have joined the execution controller for this job.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersReconnected = new Gauge({
-  name: `${metricPrefix}_workers_reconnected`,
+  name: `${metricPrefix}_controller_workers_reconnected`,
   help: 'Total number of Teraslice workers that have reconnected to the execution controller for this job.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeWorkersDisconnected = new Gauge({
-  name: `${metricPrefix}_workers_disconnected`,
+  name: `${metricPrefix}_controller_workers_disconnected`,
   help: 'Total number of Teraslice workers that have disconnected from execution controller for this job.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
@@ -83,8 +83,8 @@ const gaugeTerasliceMasterInfo = new Gauge({
 });
 
 const gaugeNumSlicers = new Gauge({
-  name: `${metricPrefix}_number_of_slicers`,
-  help: 'Number of execution controllers running for this execution.',
+  name: `${metricPrefix}_controller_slicers_count`,
+  help: 'Number of execution controllers (slicers) running for this execution.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
@@ -99,30 +99,37 @@ const gaugeQueryDuration = new Gauge({
 // Execution Related Metrics
 
 const gaugeCpuLimit = new Gauge({
-  name: `${metricPrefix}_ex_cpu_limit`,
+  name: `${metricPrefix}_execution_cpu_limit`,
   help: 'CPU core limit for a Teraslice worker container.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeCpuRequest = new Gauge({
-  name: `${metricPrefix}_ex_cpu_request`,
+  name: `${metricPrefix}_execution_cpu_request`,
   help: 'Requested number of CPU cores for a Teraslice worker container.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeMemoryLimit = new Gauge({
-  name: `${metricPrefix}_ex_memory_limit`,
+  name: `${metricPrefix}_execution_memory_limit`,
   help: 'Memory limit for Teraslice a worker container.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeMemoryRequest = new Gauge({
-  name: `${metricPrefix}_ex_memory_request`,
+  name: `${metricPrefix}_execution_memory_request`,
   help: 'Requested amount of memory for a Teraslice worker container.',
   labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeExStatus = new Gauge({
+  name: `${metricPrefix}_execution_status`,
+  help: 'Current status of the Teraslice execution.',
+  labelNames: [...exLabelNames, 'status'],
   registers: [metricsRegistry],
 });
 
@@ -130,22 +137,52 @@ const gaugeMemoryRequest = new Gauge({
 // prom-client is concerned, this usage is fine:
 //   https://github.com/siimon/prom-client/issues/192
 const gaugeSlicesProcessed = new Gauge({
-  name: `${metricPrefix}_slices_processed`,
+  name: `${metricPrefix}_controller_slices_processed`,
   help: 'Number of slices processed.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeSlicesFailed = new Gauge({
-  name: `${metricPrefix}_slices_failed`,
+  name: `${metricPrefix}_controller_slices_failed`,
   help: 'Number of slices failed.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
 
 const gaugeSlicesQueued = new Gauge({
-  name: `${metricPrefix}_slices_queued`,
+  name: `${metricPrefix}_controller_slices_queued`,
   help: 'Number of slices queued for processing.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+// Execution Related Metrics
+
+const gaugeCreatedTime = new Gauge({
+  name: `${metricPrefix}_execution_created_timestamp_seconds`,
+  help: 'Execution creation time.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeUpdatedTime = new Gauge({
+  name: `${metricPrefix}_execution_updated_timestamp_seconds`,
+  help: 'Execution update time.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeExSlicers = new Gauge({
+  name: `${metricPrefix}_execution_slicers`,
+  help: 'Number of slicers defined on the execution.',
+  labelNames: exLabelNames,
+  registers: [metricsRegistry],
+});
+
+const gaugeExWorkers = new Gauge({
+  name: `${metricPrefix}_execution_workers`,
+  help: 'Number of workers defined on the execution.  Note that the number of actual workers can differ from this value.',
   labelNames: exLabelNames,
   registers: [metricsRegistry],
 });
@@ -196,6 +233,41 @@ function parseController(controller:any, labels:any) {
   gaugeSlicesQueued.set(controllerLabels, controller.queued);
 
   gaugeNumSlicers.set(controllerLabels, controller.slicers);
+}
+
+function generateExecutionStatusMetrics(execution:any, executionLabels:any) {
+  const statusList = [
+    'completed',
+    'failed',
+    'failing',
+    'initializing',
+    'paused',
+    'pending',
+    'recovering',
+    'rejected',
+    'running',
+    'scheduling',
+    'stopped',
+    'stopping',
+    'terminated',
+  ];
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const status of statusList) {
+    const statusLabels = {
+      ...executionLabels,
+      status,
+    };
+    // if (status ===  execution._status)
+    let state:number;
+    // eslint-disable-next-line no-underscore-dangle
+    if (status === execution._status) {
+      state = 1;
+    } else {
+      state = 0;
+    }
+    gaugeExStatus.set(statusLabels, state);
+  }
 }
 
 /**
@@ -266,6 +338,15 @@ function parseExecution(execution:any, labels:any) {
   if (execution.cpu) gaugeCpuLimit.set(executionLabels, execution.cpu);
   if (execution.memory) gaugeMemoryRequest.set(executionLabels, execution.memory);
   if (execution.memory) gaugeMemoryLimit.set(executionLabels, execution.memory);
+
+  // eslint-disable-next-line no-underscore-dangle
+  gaugeCreatedTime.set(executionLabels, new Date(execution._created).getTime() / 1000);
+  // eslint-disable-next-line no-underscore-dangle
+  gaugeUpdatedTime.set(executionLabels, new Date(execution._updated).getTime() / 1000);
+
+  gaugeExSlicers.set(executionLabels, execution.slicers);
+  gaugeExWorkers.set(executionLabels, execution.workers);
+  generateExecutionStatusMetrics(execution, executionLabels);
 }
 
 function generateControllerStats(terasliceStats:TerasliceStats, labels:any) {
