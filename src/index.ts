@@ -265,15 +265,14 @@ function generateExecutionStatusMetrics(execution:any, executionLabels:any) {
         'terminated',
     ];
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const status of statusList) {
         const statusLabels = {
             ...executionLabels,
             status,
         };
-        // if (status ===  execution._status)
+
         let state:number;
-        // eslint-disable-next-line no-underscore-dangle
+
         if (status === execution._status) {
             state = 1;
         } else {
@@ -352,9 +351,7 @@ function parseExecution(execution:any, labels:any) {
     if (execution.memory) gaugeMemoryRequest.set(executionLabels, execution.memory);
     if (execution.memory) gaugeMemoryLimit.set(executionLabels, execution.memory);
 
-    // eslint-disable-next-line no-underscore-dangle
     gaugeCreatedTime.set(executionLabels, new Date(execution._created).getTime() / 1000);
-    // eslint-disable-next-line no-underscore-dangle
     gaugeUpdatedTime.set(executionLabels, new Date(execution._updated).getTime() / 1000);
 
     gaugeExSlicers.set(executionLabels, execution.slicers);
@@ -363,16 +360,12 @@ function parseExecution(execution:any, labels:any) {
 }
 
 function generateControllerStats(terasliceStats:TerasliceStats, labels:any) {
-    // FIXME: I should rethink this warning
-    // eslint-disable-next-line no-restricted-syntax
     for (const controller of terasliceStats.controllers) {
         parseController(controller, labels);
     }
 }
 
 function generateExecutionStats(terasliceStats:TerasliceStats, labels:any) {
-    // FIXME: I should rethink this warning
-    // eslint-disable-next-line no-restricted-syntax
     for (const execution of terasliceStats.executions) {
         parseExecution(execution, labels);
     }
@@ -431,9 +424,7 @@ interface StateExecutionList {
 function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
     const executions:StateExecutionList = {};
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const [, workerNode] of Object.entries(terasliceStats.state)) {
-    // eslint-disable-next-line no-restricted-syntax
         for (const worker of workerNode.active) {
             if (worker.ex_id && !Object.prototype.hasOwnProperty.call(executions, worker.ex_id)) {
                 executions[worker.ex_id] = {
@@ -445,7 +436,6 @@ function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
         }
     }
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const [, execution] of Object.entries(executions)) {
         const regex = /.*:(.*)_.*/g;
         const m = [...execution.image.matchAll(regex)];

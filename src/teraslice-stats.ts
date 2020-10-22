@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import got from 'got';
 
 // TODO: move these interfaces out into their own file
@@ -77,13 +76,10 @@ interface TerasliceClusterState {
 
 interface TerasliceInfo {
     arch: string,
-    // eslint-disable-next-line camelcase
     clustering_type: string,
     name: string,
-    // eslint-disable-next-line camelcase
     node_version: string,
     platform: string,
-    // eslint-disable-next-line camelcase
     teraslice_version: string
 }
 
@@ -184,7 +180,6 @@ export default class TerasliceStats implements TerasliceStatsInterface {
         for (let i = 0; i < this.controllers.length; i += maxConcurrency) {
             const controllersSlice = this.controllers.slice(i, i + maxConcurrency);
 
-            // eslint-disable-next-line no-await-in-loop
             const r = await Promise.all(
                 controllersSlice.map((x) => this.getTerasliceApi(`/v1/ex/${x.ex_id}`)),
             );
@@ -192,7 +187,6 @@ export default class TerasliceStats implements TerasliceStatsInterface {
             // eslint-disable-next-line prefer-spread
             this.executions.push.apply(this.executions, r.map((x) => x.data));
 
-            // eslint-disable-next-line no-await-in-loop
             await pDelay(queryDelay);
         }
 
