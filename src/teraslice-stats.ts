@@ -1,5 +1,10 @@
 import got from 'got';
 
+interface GetTerasliceApiResponse {
+    data: any,
+    queryDuration: number
+}
+
 // TODO: move these interfaces out into their own file
 /**
  * TerasliceWorker - The individual teraslice worker object in the
@@ -142,13 +147,10 @@ export default class TerasliceStats implements TerasliceStatsInterface {
         };
     }
 
-    async getTerasliceApi(path:string) {
+    async getTerasliceApi(path:string):Promise<GetTerasliceApiResponse> {
         const url = new URL(path, this.baseUrl);
-        let r: {
-            data: any,
-            queryDuration: number
-        };
-        let response : {
+        let r:GetTerasliceApiResponse;
+        let response: {
             body: any,
             statusCode: number,
             timings: any
@@ -171,7 +173,7 @@ export default class TerasliceStats implements TerasliceStatsInterface {
         return r;
     }
 
-    async updateExecutions() {
+    async updateExecutions():Promise<void> {
         const time = process.hrtime();
         this.executions = [];
         const maxConcurrency = 10;
@@ -197,7 +199,7 @@ export default class TerasliceStats implements TerasliceStatsInterface {
 
     // I think I've been doing this sort of thing wrong in the past.
     // https://stackoverflow.com/questions/45285129/any-difference-between-await-promise-all-and-multiple-await
-    async update() {
+    async update():Promise<void> {
     // TODO: hard coding querySize is dumb
         const querySize = 200;
         const run = async () => {
