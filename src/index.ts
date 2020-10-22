@@ -69,7 +69,7 @@ const gaugeWorkersDisconnected = new Gauge({
 
 const gaugeTerasliceMasterInfo = new Gauge({
   name: `${metricPrefix}_master_info`,
-  help: 'Information about the teraslice master node.',
+  help: 'Information about the Teraslice master node.',
   labelNames: [
     'arch',
     'clustering_type',
@@ -77,6 +77,19 @@ const gaugeTerasliceMasterInfo = new Gauge({
     'node_version',
     'platform',
     'teraslice_version',
+    ...globalLabelNames,
+  ],
+  registers: [metricsRegistry],
+});
+
+const gaugeExecutionInfo = new Gauge({
+  name: `${metricPrefix}_execution_info`,
+  help: 'Information about Teraslice execution.',
+  labelNames: [
+    'ex_id',
+    'job_id',
+    'image',
+    'version',
     ...globalLabelNames,
   ],
   registers: [metricsRegistry],
@@ -365,6 +378,93 @@ function generateExecutionStats(terasliceStats:TerasliceStats, labels:any) {
   }
 }
 
+interface StateExecution {
+  exId: string,
+  jobId: string,
+  image: string
+}
+interface StateExecutionList {
+  [key: string]: StateExecution
+}
+
+/**
+ * NOTE: This assumes Teraslice is running in Kubernetes mode.
+ *
+ * generateExecutionVersions - takes the /cluster/state output, which looks like
+ * this:
+ *
+ *    "10.123.4.111": {
+ *      "node_id": "10.123.4.111",
+ *      "hostname": "10.123.4.111",
+ *      "pid": "N/A",
+ *      "node_version": "N/A",
+ *      "teraslice_version": "N/A",
+ *      "total": "N/A",
+ *      "state": "connected",
+ *      "available": "N/A",
+ *      "active": [
+ *          {
+ *              "assets": [],
+ *              "assignment": "worker",
+ *              "ex_id": "5ba1da6a-0ba2-49f4-92c3-d436ba510111",
+ *              "image": "teraslice:v0.70.0",
+ *              "job_id": "7e6dfa3c-6665-455d-9d52-f11bd32ad111",
+ *              "pod_name": "ts-wkr-my-job-name-1d940e75-58d9-74c54e7dc1-nxaaa",
+ *              "pod_ip": "10.132.86.111",
+ *              "worker_id": "ts-wkr-my-job-name-1d940e75-58d9-74c54e7dc1-nxaaa"
+ *          }
+ *        ]
+ *      }
+ *
+ * and makes something like this:
+ *
+ * {
+ *  exId: {exId, jobId, image},
+ *  exId: {exId, jobId, image}
+ * }
+ *
+ * That then gets used to generate the metrics.
+ *
+ * @param terasliceStats
+ * @param labels
+ */
+function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
+  const executions:StateExecutionList = {};
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const [, workerNode] of Object.entries(terasliceStats.state)) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const worker of workerNode.active) {
+      if (worker.ex_id && !Object.prototype.hasOwnProperty.call(executions, worker.ex_id)) {
+        executions[worker.ex_id] = {
+          exId: worker.ex_id,
+          jobId: worker.job_id,
+          image: worker.image,
+        };
+      }
+    }
+  }
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const [, execution] of Object.entries(executions)) {
+    const regex = /.*:(.*)_.*/g;
+    const m = [...execution.image.matchAll(regex)];
+    let version = '';
+    if (m[0] !== []) {
+      // eslint-disable-next-line prefer-destructuring
+      version = m[0][1];
+    }
+    const executionLabels = {
+      ex_id: execution.exId,
+      job_id: execution.jobId,
+      image: execution.image,
+      version,
+      ...labels,
+    };
+    gaugeExecutionInfo.set(executionLabels, 1);
+  }
+}
+
 function updateTerasliceMetrics(terasliceStats: TerasliceStats) {
   const globalLabels = {
     url: terasliceStats.baseUrl.toString(),
@@ -379,6 +479,7 @@ function updateTerasliceMetrics(terasliceStats: TerasliceStats) {
 
   generateControllerStats(terasliceStats, globalLabels);
   generateExecutionStats(terasliceStats, globalLabels);
+  generateExecutionVersions(terasliceStats, globalLabels);
 
   gaugeQueryDuration.set(
     { query_name: 'info', ...globalLabels },
@@ -395,6 +496,10 @@ function updateTerasliceMetrics(terasliceStats: TerasliceStats) {
   gaugeQueryDuration.set(
     { query_name: 'executions', ...globalLabels },
     terasliceStats.queryDuration.executions,
+  );
+  gaugeQueryDuration.set(
+    { query_name: 'state', ...globalLabels },
+    terasliceStats.queryDuration.state,
   );
 }
 

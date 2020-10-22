@@ -1,6 +1,79 @@
+/* eslint-disable camelcase */
 import got from 'got';
 
 // TODO: move these interfaces out into their own file
+/**
+ * TerasliceWorker - The individual teraslice worker object in the
+ * TerasliceWorkerNode.active array.  This corresponds to a k8s pod in k8s mode.
+ *
+ * Example:
+ *  {
+ *      "assets": [],
+ *      "assignment": "worker",
+ *      "ex_id": "5ba1da6a-0ba2-49f4-92c3-d436ba510111",
+ *      "image": "teraslice:v0.70.0",
+ *      "job_id": "7e6dfa3c-6665-455d-9d52-f11bd32ad111",
+ *      "pod_name": "ts-wkr-my-job-name-1d940e75-58d9-74c54e7dc1-nxaaa",
+ *      "pod_ip": "10.132.86.111",
+ *      "worker_id": "ts-wkr-my-job-name-1d940e75-58d9-74c54e7dc1-nxaaa"
+ *  }
+ */
+interface TerasliceWorker {
+  assets: string[],
+  assignment: string,
+  ex_id: string,
+  image: string,
+  job_id: string,
+  pod_name: string,
+  pod_ip: string,
+  worker_id: string
+}
+
+/**
+ * {
+ *  "node_id": "10.123.4.111",
+ *  "hostname": "10.123.4.111",
+ *  "pid": "N/A",
+ *  "node_version": "N/A",
+ *  "teraslice_version": "N/A",
+ *  "total": "N/A",
+ *  "state": "connected",
+ *  "available": "N/A",
+ *  "active": [...]
+ * }
+ */
+interface TerasliceWorkerNodeInfo {
+  node_id: string,
+  hostname: string,
+  pid: string,
+  node_version: string,
+  teraslice_version: string,
+  total: string,
+  state: string,
+  available: string,
+  active: TerasliceWorker[]
+}
+
+/**
+ * "10.123.4.111": {
+ *      "node_id": "10.123.4.111",
+ *      "hostname": "10.123.4.111",
+ *      "pid": "N/A",
+ *      "node_version": "N/A",
+ *      "teraslice_version": "N/A",
+ *      "total": "N/A",
+ *      "state": "connected",
+ *      "available": "N/A",
+ *      "active": [...]
+ * }
+ */
+// interface TerasliceWorkerNode {
+//   [key: string]: TerasliceWorkerNodeInfo
+// }
+
+interface TerasliceClusterState {
+  [key: string]: TerasliceWorkerNodeInfo
+}
 
 interface TerasliceInfo {
   arch: string,
@@ -22,6 +95,7 @@ interface TerasliceQueryDuration {
   executions: number,
   info: number,
   jobs: number,
+  state: number,
 }
 
 interface TerasliceStatsInterface {
@@ -30,6 +104,7 @@ interface TerasliceStatsInterface {
     executions: any[],
     info: TerasliceInfo,
     jobs: any[],
+    state: TerasliceClusterState,
     queryDuration: TerasliceQueryDuration
 }
 
@@ -51,6 +126,8 @@ export default class TerasliceStats implements TerasliceStatsInterface {
 
   jobs: any[];
 
+  state: TerasliceClusterState;
+
   queryDuration: TerasliceQueryDuration;
 
   constructor(baseUrl:string) {
@@ -58,12 +135,14 @@ export default class TerasliceStats implements TerasliceStatsInterface {
     this.controllers = [];
     this.executions = [];
     this.jobs = [];
+    this.state = {};
 
     this.queryDuration = {
       controllers: 0,
       executions: 0,
       info: 0,
       jobs: 0,
+      state: 0,
     };
   }
 
@@ -128,19 +207,22 @@ export default class TerasliceStats implements TerasliceStatsInterface {
     // TODO: hard coding querySize is dumb
     const querySize = 200;
     const run = async () => {
-      const [info, jobs, controllers] = await Promise.all([
+      const [info, jobs, controllers, state] = await Promise.all([
         this.getTerasliceApi('/'),
         this.getTerasliceApi(`/v1/jobs?size=${querySize}`),
         this.getTerasliceApi('/v1/cluster/controllers'),
+        this.getTerasliceApi('/v1/cluster/state'),
       ]);
       this.info = info.data;
       this.jobs = jobs.data;
       this.controllers = controllers.data;
+      this.state = state.data;
       await this.updateExecutions();
 
       this.queryDuration.info = info.queryDuration;
       this.queryDuration.jobs = jobs.queryDuration;
       this.queryDuration.controllers = controllers.queryDuration;
+      this.queryDuration.state = state.queryDuration;
     };
     await run().catch((err) => {
       throw new Error(`Error caught on run() ${this.baseUrl}: ${err}`);
