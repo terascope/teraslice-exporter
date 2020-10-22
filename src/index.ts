@@ -4,6 +4,9 @@ import { Gauge, Registry } from 'prom-client';
 import express from 'express';
 import bunyan from 'bunyan';
 
+import {
+    StateExecutionList
+} from './interfaces';
 import TerasliceStats from './teraslice-stats';
 
 const server = express();
@@ -369,15 +372,6 @@ function generateExecutionStats(terasliceStats:TerasliceStats, labels:any) {
     for (const execution of terasliceStats.executions) {
         parseExecution(execution, labels);
     }
-}
-
-interface StateExecution {
-    exId: string,
-    jobId: string,
-    image: string
-}
-interface StateExecutionList {
-    [key: string]: StateExecution
 }
 
 /**
