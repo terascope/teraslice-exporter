@@ -38,6 +38,22 @@ connections
 * `TERASLICE_QUERY_DELAY` - The delay between updating the Teraslice stats, this
 value is in ms.
 
+### Docker
+
+Build the docker image:
+
+```bash
+docker build -t teraslice-exporter:v0.1.0 .
+```
+
+Run the docker image:
+
+```bash
+docker run --rm -p 3000:3000 \
+    -e TERASLICE_URL="http://url.to.teraslice/" \
+    teraslice-exporter:v0.1.0 | bunyan
+```
+
 ## Design
 
 The exporter will scrape several of the Teraslice API endpoints every

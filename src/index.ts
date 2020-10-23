@@ -50,17 +50,23 @@ async function main() {
     updateTerasliceMetrics(terasliceStats);
 
     setInterval(async () => {
-        logger.info(`Updating Teraslice Cluster Information from ${baseUrl}`);
+        logger.info({ terasliceUrl: baseUrl }, 'Begining update of Teraslice state');
         await terasliceStats.update();
         updateTerasliceMetrics(terasliceStats);
 
-        logger.debug(`queryDurations: ${JSON.stringify(terasliceStats.queryDuration)}`);
-        logger.info(`datasetSizes: ${JSON.stringify({
-            info: terasliceStats.info.length,
-            controllers: terasliceStats.controllers.length,
-            executions: terasliceStats.executions.length,
-            jobs: terasliceStats.jobs.length,
-        })}`);
+        const datasetSizes = {
+            terasliceUrl: baseUrl,
+            datasetSizes: {
+                info: terasliceStats.info.length,
+                controllers: terasliceStats.controllers.length,
+                executions: terasliceStats.executions.length,
+                jobs: terasliceStats.jobs.length,
+            }
+        };
+        logger.debug(
+            { terasliceUrl: baseUrl, queryDurations: terasliceStats.queryDuration }, 'Query Durations'
+        );
+        logger.info(datasetSizes, 'Update complete.');
     }, terasliceQueryDelay);
 
     logger.info(`HTTP server listening to ${port}, metrics exposed on ${metricsEndpoint} endpoint`);
