@@ -110,8 +110,6 @@ export default class TerasliceStats implements TerasliceStatsInterface {
             this.queryDuration.controllers = controllers.queryDuration;
             this.queryDuration.state = state.queryDuration;
         };
-        await run().catch((err) => {
-            throw new Error(`Error caught on run() ${this.baseUrl}: ${err}`);
-        });
+        await run();
     }
 }
