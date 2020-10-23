@@ -47,9 +47,6 @@ async function main() {
     await terasliceStats.update();
     updateTerasliceMetrics(terasliceStats);
 
-    logger.debug(`executions: ${JSON.stringify(terasliceStats.executions.slice(0, 2), null, 2)}`);
-    logger.debug(`controllers: ${JSON.stringify(terasliceStats.controllers.slice(0, 2), null, 2)}`);
-
     setInterval(async () => {
         logger.debug(`Updating Teraslice Cluster Information from ${baseUrl}`);
         await terasliceStats.update();
