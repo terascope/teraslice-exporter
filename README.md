@@ -1,5 +1,9 @@
 # Teraslice Job Exporter README
 
+Note: This exporter is only meant for use with Teraslice using Kubernetes
+clustering.  It hasn't been tested with Teraslice running in Native clustering
+mode.
+
 ## Usage
 
 So far it works like this:
@@ -7,101 +11,59 @@ So far it works like this:
 ```bash
 TERASLICE_URL="https://localhost" \
   DEBUG=True \
-  NODE_EXTRA_CA_CERTS=~/Downloads/ca.crt \
+  NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
   node dist/index.js | bunyan
 ```
 
+All options are passed as environment variables
+
+```bash
+TERASLICE_URL="https://localhost" \
+  DEBUG=True \
+  NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
+  PORT=4242 \
+  TERASLICE_QUERY_DELAY=90000
+  node dist/index.js | bunyan
+```
+
+The `TERASLICE_URL` is the only environment variable that is required.
+
+### Environment variables
+
+* `TERASLICE_URL` - URL to the Teraslice Instance to Monitor
+* `DEBUG` - Enable debug logging
+* `NODE_EXTRA_CA_CERTS` - Standard Node variable to specify CA cert for SSL
+connections
+* `PORT` - The port that the http express server will listen on
+* `TERASLICE_QUERY_DELAY` - The delay between updating the Teraslice stats, this
+value is in ms.
+
 ## Design
 
-Scrape the `/v1/cluster/controllers` endpoint periodically to get an array of
-active controllers, like this
+The exporter will scrape several of the Teraslice API endpoints every
+`TERASLICE_QUERY_DELAY` milliseconds and update it's exported metrics after that
+update is completed.
 
-```json
-[
-    {
-        "ex_id": "5ba1da6a-0ba2-49f4-92c3-d436ba510e59",
-        "job_id": "7e6dfa3c-6665-455d-9d52-f11bd32ad18a",
-        "name": "my_job_name",
-        "workers_available": 0,
-        "workers_active": 6,
-        "workers_joined": 6,
-        "workers_reconnected": 0,
-        "workers_disconnected": 0,
-        "job_duration": 0,
-        "failed": 1,
-        "subslices": 0,
-        "queued": 7,
-        "slice_range_expansion": 0,
-        "processed": 204156,
-        "slicers": 1,
-        "subslice_by_key": 0,
-        "started": "2020-09-17T21:08:58.905Z",
-        "queuing_complete": ""
-    }
-]
-```
-
-Labels?
-
-```txt
-cluster = ts-prod
-ex_id = 5ba1da6a-0ba2-49f4-92c3-d436ba510e59,
-job_id = 7e6dfa3c-6665-455d-9d52-f11bd32ad18a,
-name = my_job_name,
-```
-
-The following metrics related to each job:
-
-```txt
-"workers_available": 0,
-"workers_active": 6,
-"workers_joined": 6,
-"workers_reconnected": 0,
-"workers_disconnected": 0,
-"job_duration": 0,
-"failed": 1,
-"subslices": 0,
-"queued": 7,
-"slice_range_expansion": 0,
-"processed": 204156,
-"slicers": 1,
-"subslice_by_key": 0,
-"started": "2020-09-17T21:08:58.905Z",
-"queuing_complete": ""
-```
-
-The following metrics related to the query response itself (timing info) derived
-from this timing info:
-
-```json
-{
-  start: 1601417492206,
-  socket: 1601417492208,
-  lookup: 1601417492213,
-  connect: 1601417492247,
-  secureConnect: 1601417492315,
-  upload: 1601417492316,
-  response: 1601417493491,
-  end: 1601417493518,
-  error: undefined,
-  abort: undefined,
-  phases: {
-    wait: 2,
-    dns: 5,
-    tcp: 34,
-    tls: 68,
-    request: 1,
-    firstByte: 1175,
-    download: 27,
-    total: 1312
-  }
-}
-```
-
-Use the following:
-
-```txt
-got_phase_firstByte: 1175,
-got_phase_download: 27,
-got_phase_total: 1312
+```text
+# HELP teraslice_controller_slicers_count Number of execution controllers (slicers) running for this execution.
+# HELP teraslice_controller_slices_failed Number of slices failed.
+# HELP teraslice_controller_slices_processed Number of slices processed.
+# HELP teraslice_controller_slices_queued Number of slices queued for processing.
+# HELP teraslice_controller_workers_active Number of Teraslice workers actively processing slices.
+# HELP teraslice_controller_workers_available Number of Teraslice workers running and waiting for work.
+# HELP teraslice_controller_workers_disconnected Total number of Teraslice workers that have disconnected from execution controller for this job.
+# HELP teraslice_controller_workers_joined Total number of Teraslice workers that have joined the execution controller for this job.
+# HELP teraslice_controller_workers_reconnected Total number of Teraslice workers that have reconnected to the execution controller for this job.
+# HELP teraslice_execution_cpu_limit CPU core limit for a Teraslice worker container.
+# HELP teraslice_execution_cpu_request Requested number of CPU cores for a Teraslice worker container.
+# HELP teraslice_execution_created_timestamp_seconds Execution creation time.
+# HELP teraslice_execution_info Information about Teraslice execution.
+# HELP teraslice_execution_memory_limit Memory limit for Teraslice a worker container.
+# HELP teraslice_execution_memory_request Requested amount of memory for a Teraslice worker container.
+# HELP teraslice_execution_slicers Number of slicers defined on the execution.
+# HELP teraslice_execution_status Current status of the Teraslice execution.
+# HELP teraslice_execution_updated_timestamp_seconds Execution update time.
+# HELP teraslice_execution_workers Number of workers defined on the execution.  Note that the number of actual workers can differ from this value.
+# HELP teraslice_master_info Information about the Teraslice master node.
+# HELP teraslice_query_duration Total time to complete the named query, in ms.
 ```

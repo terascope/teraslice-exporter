@@ -41,19 +41,21 @@ async function main() {
         res.send(`See the '${metricsEndpoint}' endpoint for the teraslice exporter.`);
     });
 
-    if (process.env.DEBUG) logger.level('debug');
+    // Node 14 introduces the ?. operator, which can be chained.  This forces
+    // node v14+
+    if (process?.env?.DEBUG?.toLowerCase() === 'true') logger.level('debug');
 
     const terasliceStats = new TerasliceStats(baseUrl);
     await terasliceStats.update();
     updateTerasliceMetrics(terasliceStats);
 
     setInterval(async () => {
-        logger.debug(`Updating Teraslice Cluster Information from ${baseUrl}`);
+        logger.info(`Updating Teraslice Cluster Information from ${baseUrl}`);
         await terasliceStats.update();
         updateTerasliceMetrics(terasliceStats);
 
         logger.debug(`queryDurations: ${JSON.stringify(terasliceStats.queryDuration)}`);
-        logger.debug(`datasetSizes: ${JSON.stringify({
+        logger.info(`datasetSizes: ${JSON.stringify({
             info: terasliceStats.info.length,
             controllers: terasliceStats.controllers.length,
             executions: terasliceStats.executions.length,
