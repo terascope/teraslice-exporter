@@ -6,9 +6,6 @@ import bunyan from 'bunyan';
 import TerasliceStats from './teraslice-stats';
 import { metricsRegistry, updateTerasliceMetrics } from './metrics';
 
-const server = express();
-const logger = bunyan.createLogger({ name: 'teraslice_exporter' });
-
 declare let process : {
     env: {
         DEBUG: string,
@@ -20,6 +17,9 @@ declare let process : {
 
 async function main() {
     let baseUrl: string;
+
+    const server = express();
+    const port = process.env.PORT || 3000;
     const metricsEndpoint = '/metrics';
 
     if (process.env.TERASLICE_URL) {
@@ -29,8 +29,11 @@ async function main() {
     } else {
         throw new Error('The TERASLICE_URL environment variable must be a valid URL to the root of your teraslice instance.');
     }
-    const port = process.env.PORT || 3000;
     const terasliceQueryDelay = process.env.TERASLICE_QUERY_DELAY || 30000; // ms
+    const logger = bunyan.createLogger({
+        name: 'teraslice_exporter',
+        terasliceUrl: baseUrl
+    });
 
     server.get(metricsEndpoint, (req, res) => {
         res.set('Content-Type', metricsRegistry.contentType);
@@ -50,12 +53,11 @@ async function main() {
     updateTerasliceMetrics(terasliceStats);
 
     setInterval(async () => {
-        logger.info({ terasliceUrl: baseUrl }, 'Begining update of Teraslice state');
+        logger.info('Begining update of Teraslice state');
         await terasliceStats.update();
         updateTerasliceMetrics(terasliceStats);
 
         const datasetSizes = {
-            terasliceUrl: baseUrl,
             datasetSizes: {
                 info: terasliceStats.info.length,
                 controllers: terasliceStats.controllers.length,
@@ -63,9 +65,7 @@ async function main() {
                 jobs: terasliceStats.jobs.length,
             }
         };
-        logger.debug(
-            { terasliceUrl: baseUrl, queryDurations: terasliceStats.queryDuration }, 'Query Durations'
-        );
+        logger.debug({ queryDurations: terasliceStats.queryDuration }, 'Query Durations');
         logger.info(datasetSizes, 'Update complete.');
     }, terasliceQueryDelay);
 
