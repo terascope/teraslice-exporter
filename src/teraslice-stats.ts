@@ -48,8 +48,7 @@ export default class TerasliceStats implements TerasliceStatsInterface {
         };
 
         try {
-            // FIXME: the .toString is to eliminate a 'No overload matches this call'
-            response = await got(url.toString(), { responseType: 'json' });
+            response = await got(url, { responseType: 'json' });
             if (response && response.statusCode === 200 && response.body) {
                 r = {
                     data: response.body,
