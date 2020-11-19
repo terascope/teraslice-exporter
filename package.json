@@ -1,5 +1,6 @@
 {
     "author": "Terascope, LLC <info@terascope.io>",
+    "version": "0.1.1",
     "license": "MIT",
     "dependencies": {
         "bunyan": "^1.8.14",
