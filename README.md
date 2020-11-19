@@ -22,7 +22,7 @@ TERASLICE_URL="https://localhost" \
   DEBUG=True \
   NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
   PORT=4242 \
-  TERASLICE_QUERY_DELAY=90000
+  TERASLICE_QUERY_DELAY=90000 \
   node dist/index.js | bunyan
 ```
 

@@ -433,6 +433,8 @@ function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
 }
 
 export function updateTerasliceMetrics(terasliceStats: TerasliceStats): void {
+    metricsRegistry.resetMetrics();
+
     const globalLabels = {
         url: terasliceStats.baseUrl.toString(),
         name: terasliceStats.info.name,
