@@ -10,6 +10,7 @@ So far it works like this:
 
 ```bash
 TERASLICE_URL="https://localhost" \
+TERASLICE_DISPLAY_URL="https://teraslice-xyz.lan" \
   DEBUG=True \
   NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
   node dist/index.js | bunyan
@@ -19,6 +20,7 @@ All options are passed as environment variables
 
 ```bash
 TERASLICE_URL="https://localhost" \
+TERASLICE_DISPLAY_URL="https://teraslice-xyz.lan" \
   DEBUG=True \
   NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
   PORT=4242 \
@@ -31,6 +33,7 @@ The `TERASLICE_URL` is the only environment variable that is required.
 ### Environment variables
 
 * `TERASLICE_URL` - URL to the Teraslice Instance to Monitor
+* `TERASLICE_DISPLAY_URL` - Optional override of TERASLICE_URL for metric label purposes only
 * `DEBUG` - Enable debug logging
 * `NODE_EXTRA_CA_CERTS` - Standard Node variable to specify CA cert for SSL
 connections

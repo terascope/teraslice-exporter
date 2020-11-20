@@ -11,6 +11,7 @@ declare let process : {
         DEBUG: string,
         PORT: number,
         TERASLICE_URL: string
+        TERASLICE_DISPLAY_URL: string
         TERASLICE_QUERY_DELAY: number
     }
 };
