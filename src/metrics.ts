@@ -89,8 +89,8 @@ const gaugeNumSlicers = new Gauge({
 });
 
 const gaugeQueryDuration = new Gauge({
-    name: `${metricPrefix}_query_duration`,
-    help: 'Total time to complete the named query, in ms.',
+    name: `${metricPrefix}_query_duration_seconds`,
+    help: 'Total time to complete the named query, in seconds.',
     labelNames: ['query_name', ...globalLabelNames],
     registers: [metricsRegistry],
 });

@@ -84,7 +84,7 @@ export default class TerasliceStats implements TerasliceStatsInterface {
 
         const NS_PER_SEC = 1e9;
         const diff = process.hrtime(time);
-        this.queryDuration.executions = Math.round((diff[0] * NS_PER_SEC + diff[1]) / 1e6);
+        this.queryDuration.executions = (diff[0] * NS_PER_SEC + diff[1]) / 1e9;
     }
 
     // I think I've been doing this sort of thing wrong in the past.
@@ -105,10 +105,10 @@ export default class TerasliceStats implements TerasliceStatsInterface {
             this.state = state.data;
             await this.updateExecutions();
 
-            this.queryDuration.info = info.queryDuration;
-            this.queryDuration.jobs = jobs.queryDuration;
-            this.queryDuration.controllers = controllers.queryDuration;
-            this.queryDuration.state = state.queryDuration;
+            this.queryDuration.info = info.queryDuration / 1e3;
+            this.queryDuration.jobs = jobs.queryDuration / 1e3;
+            this.queryDuration.controllers = controllers.queryDuration / 1e3;
+            this.queryDuration.state = state.queryDuration / 1e3;
         };
         await run();
     }
