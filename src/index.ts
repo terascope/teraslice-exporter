@@ -18,6 +18,7 @@ declare let process : {
 
 async function main() {
     let baseUrl: string;
+    let displayUrl: string;
 
     const server = express();
     const port = process.env.PORT || 3000;
@@ -29,6 +30,13 @@ async function main() {
         baseUrl = new URL(process.env.TERASLICE_URL).toString();
     } else {
         throw new Error('The TERASLICE_URL environment variable must be a valid URL to the root of your teraslice instance.');
+    }
+    if (process.env.TERASLICE_DISPLAY_URL) {
+    // I instantiate a URL, then immediately call toString() just to get the
+    // URL validation but keep a string type
+        displayUrl = new URL(process.env.TERASLICE_DISPLAY_URL).toString();
+    } else {
+        displayUrl = baseUrl;
     }
     const terasliceQueryDelay = process.env.TERASLICE_QUERY_DELAY || 30000; // ms
     const logger = bunyan.createLogger({
@@ -49,7 +57,7 @@ async function main() {
     // node v14+
     if (process?.env?.DEBUG?.toLowerCase() === 'true') logger.level('debug');
 
-    const terasliceStats = new TerasliceStats(baseUrl);
+    const terasliceStats = new TerasliceStats(baseUrl, displayUrl);
     await terasliceStats.update();
     updateTerasliceMetrics(terasliceStats);
 

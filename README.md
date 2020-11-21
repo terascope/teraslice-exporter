@@ -10,7 +10,7 @@ So far it works like this:
 
 ```bash
 TERASLICE_URL="https://localhost" \
-TERASLICE_DISPLAY_URL="https://teraslice-xyz.lan" \
+  TERASLICE_DISPLAY_URL="https://teraslice-xyz.lan" \
   DEBUG=True \
   NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
   node dist/index.js | bunyan
@@ -20,7 +20,7 @@ All options are passed as environment variables
 
 ```bash
 TERASLICE_URL="https://localhost" \
-TERASLICE_DISPLAY_URL="https://teraslice-xyz.lan" \
+  TERASLICE_DISPLAY_URL="https://teraslice-xyz.lan" \
   DEBUG=True \
   NODE_EXTRA_CA_CERTS=/path/to/ca.crt \
   PORT=4242 \

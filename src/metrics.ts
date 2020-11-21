@@ -435,14 +435,8 @@ function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
 export function updateTerasliceMetrics(terasliceStats: TerasliceStats): void {
     metricsRegistry.resetMetrics();
 
-    let baseURLLabel = terasliceStats.baseUrl.toString()
-
-    if (process?.env?.TERASLICE_DISPLAY_URL) {
-        baseURLLabel = process?.env?.TERASLICE_DISPLAY_URL?.toLowerCase()
-    }
-
     const globalLabels = {
-        url: baseURLLabel,
+        url: terasliceStats.displayUrl.toString(),
         name: terasliceStats.info.name,
     };
     // NOTE: This set of labels expands out to including 'name' twice, right now
