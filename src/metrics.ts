@@ -436,7 +436,7 @@ export function updateTerasliceMetrics(terasliceStats: TerasliceStats): void {
     metricsRegistry.resetMetrics();
 
     const globalLabels = {
-        url: terasliceStats.baseUrl.toString(),
+        url: terasliceStats.displayUrl.toString(),
         name: terasliceStats.info.name,
     };
     // NOTE: This set of labels expands out to including 'name' twice, right now

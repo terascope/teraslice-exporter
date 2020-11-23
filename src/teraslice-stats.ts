@@ -10,6 +10,8 @@ import { pDelay } from './util';
 export default class TerasliceStats implements TerasliceStatsInterface {
     baseUrl: URL;
 
+    displayUrl: string;
+
     controllers: any[];
 
     executions: any[];
@@ -22,8 +24,9 @@ export default class TerasliceStats implements TerasliceStatsInterface {
 
     queryDuration: TerasliceQueryDuration;
 
-    constructor(baseUrl:string) {
+    constructor(baseUrl:string, displayUrl:string) {
         this.baseUrl = new URL(baseUrl);
+        this.displayUrl = displayUrl;
         this.controllers = [];
         this.executions = [];
         this.jobs = [];
