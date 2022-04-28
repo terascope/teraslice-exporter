@@ -3,6 +3,7 @@ import {
     StateExecutionList
 } from './interfaces';
 import TerasliceStats from './teraslice-stats';
+import { extractVersionFromImageTag } from './util';
 
 export const metricsRegistry = new Registry();
 
@@ -414,18 +415,11 @@ function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
     }
 
     for (const [, execution] of Object.entries(executions)) {
-        const regex = /.*:(.*)_.*/g;
-        const m = [...execution.image.matchAll(regex)];
-        let version = '';
-        if (m[0] !== []) {
-            // eslint-disable-next-line prefer-destructuring
-            version = m[0][1];
-        }
         const executionLabels = {
             ex_id: execution.exId,
             job_id: execution.jobId,
             image: execution.image,
-            version,
+            version: extractVersionFromImageTag(execution.image),
             ...labels,
         };
         gaugeExecutionInfo.set(executionLabels, 1);
