@@ -6,15 +6,17 @@ import bunyan from 'bunyan';
 import TerasliceStats from './teraslice-stats';
 import { metricsRegistry, updateTerasliceMetrics } from './metrics';
 
-declare let process : {
-    env: {
-        DEBUG: string,
-        PORT: number,
-        TERASLICE_URL: string
-        TERASLICE_DISPLAY_URL: string
-        TERASLICE_QUERY_DELAY: number
+declare global {
+    namespace NodeJS {
+    interface ProcessEnv {
+            DEBUG: string,
+            PORT: number,
+            TERASLICE_URL: string
+            TERASLICE_DISPLAY_URL: string
+            TERASLICE_QUERY_DELAY: number
+        }
     }
-};
+}
 
 async function main() {
     let baseUrl: string;
@@ -58,13 +60,34 @@ async function main() {
     if (process?.env?.DEBUG?.toLowerCase() === 'true') logger.level('debug');
 
     const terasliceStats = new TerasliceStats(baseUrl, displayUrl);
-    await terasliceStats.update();
-    updateTerasliceMetrics(terasliceStats);
+
+    try {
+        await terasliceStats.update();
+    } catch (error) {
+        logger.error(`Error encountered getting terasliceStats: ${error}`);
+        process.exit(1);
+    }
+    try {
+        updateTerasliceMetrics(terasliceStats);
+    } catch (error) {
+        logger.error(`Error processing Teraslice cluster state: ${error}`);
+        process.exit(2);
+    }
 
     setInterval(async () => {
-        logger.info('Begining update of Teraslice state');
-        await terasliceStats.update();
-        updateTerasliceMetrics(terasliceStats);
+        logger.info('Beginning update of Teraslice state');
+        try {
+            await terasliceStats.update();
+        } catch (error) {
+            logger.error(`Error encountered getting terasliceStats: ${error}`);
+            process.exit(1)
+        }
+        try {
+            updateTerasliceMetrics(terasliceStats);
+        } catch (error) {
+            logger.error(`Error processing Teraslice cluster state: ${error}`);
+            process.exit(2);
+        }
 
         const datasetSizes = {
             datasetSizes: {
