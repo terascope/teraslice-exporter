@@ -85,4 +85,5 @@ update is completed.
 # HELP teraslice_execution_workers Number of workers defined on the execution.  Note that the number of actual workers can differ from this value.
 # HELP teraslice_master_info Information about the Teraslice master node.
 # HELP teraslice_query_duration Total time to complete the named query, in ms.
+# HELP teraslice_exporter_errors Number of errors encountered by teraslice exporter.
 ```

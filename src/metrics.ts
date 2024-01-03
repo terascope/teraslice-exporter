@@ -187,6 +187,13 @@ const gaugeExWorkers = new Gauge({
     registers: [metricsRegistry],
 });
 
+const gaugeTerasliceExporterErrors = new Gauge({
+    name: `${metricPrefix}_exporter_errors`,
+    help: 'Number of errors encountered by teraslice exporter.',
+    labelNames: ['error_type'],
+    registers: [metricsRegistry],
+});
+
 /**
  * parseController adds the teraslice execution controller metrics to the
  * metricsRegistry for a single execution.
@@ -426,6 +433,11 @@ function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
     }
 }
 
+function generateExporterErrorStats(terasliceStats:TerasliceStats) {
+        gaugeTerasliceExporterErrors.set({'error_type': 'update_stats_errors' }, terasliceStats.errors.statsErrors);
+        gaugeTerasliceExporterErrors.set({'error_type': 'update_metrics_errors' }, terasliceStats.errors.metricsErrors);
+}
+
 export function updateTerasliceMetrics(terasliceStats: TerasliceStats): void {
     metricsRegistry.resetMetrics();
 
@@ -443,6 +455,7 @@ export function updateTerasliceMetrics(terasliceStats: TerasliceStats): void {
     generateControllerStats(terasliceStats, globalLabels);
     generateExecutionStats(terasliceStats, globalLabels);
     generateExecutionVersions(terasliceStats, globalLabels);
+    generateExporterErrorStats(terasliceStats);
 
     gaugeQueryDuration.set(
         { query_name: 'info', ...globalLabels },
