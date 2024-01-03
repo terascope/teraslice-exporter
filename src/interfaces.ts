@@ -109,5 +109,11 @@ export interface TerasliceStatsInterface {
     info: TerasliceInfo,
     jobs: any[],
     state: TerasliceClusterState,
-    queryDuration: TerasliceQueryDuration
+    queryDuration: TerasliceQueryDuration,
+    errors: TerasliceStatsErrors
+}
+
+export interface TerasliceStatsErrors {
+    statsErrors: number,
+    metricsErrors: number
 }

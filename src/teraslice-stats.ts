@@ -3,7 +3,8 @@ import {
     TerasliceStatsInterface,
     GetTerasliceApiResponse,
     TerasliceClusterState,
-    TerasliceQueryDuration
+    TerasliceQueryDuration,
+    TerasliceStatsErrors
 } from './interfaces';
 import { pDelay } from './util';
 
@@ -24,6 +25,8 @@ export default class TerasliceStats implements TerasliceStatsInterface {
 
     queryDuration: TerasliceQueryDuration;
 
+    errors: TerasliceStatsErrors;
+
     constructor(baseUrl:string, displayUrl:string) {
         this.baseUrl = new URL(baseUrl);
         this.displayUrl = displayUrl;
@@ -39,6 +42,10 @@ export default class TerasliceStats implements TerasliceStatsInterface {
             jobs: 0,
             state: 0,
         };
+        this.errors = {
+            statsErrors: 0,
+            metricsErrors: 0
+        }
     }
 
     async getTerasliceApi(path:string):Promise<GetTerasliceApiResponse> {
@@ -114,5 +121,14 @@ export default class TerasliceStats implements TerasliceStatsInterface {
             this.queryDuration.state = state.queryDuration / 1e3;
         };
         await run();
+    }
+
+    updateErrors(errorType: string):void {
+        if (errorType === 'stats') {
+            this.errors.statsErrors++;
+        }
+        else if (errorType === 'metrics') {
+            this.errors.metricsErrors++;
+        }
     }
 }
