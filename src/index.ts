@@ -80,6 +80,7 @@ async function main() {
             await terasliceStats.update();
                     } catch (error) {
             logger.error(`Error encountered getting terasliceStats: ${error}`);
+            // TODO: record stats on the specific endpoint that had an error
             terasliceStats.updateErrors('stats');
             return;
         }
