@@ -64,13 +64,13 @@ async function main() {
     try {
         await terasliceStats.update();
     } catch (error) {
-        logger.error(`Error encountered getting terasliceStats: ${error}`);
+        logger.warn(`Error encountered getting terasliceStats: ${error}`);
         terasliceStats.updateErrors('stats');
     }
     try {
         updateTerasliceMetrics(terasliceStats);
     } catch (error) {
-        logger.error(`Error processing Teraslice cluster state: ${error}`);
+        logger.warn(`Error processing Teraslice cluster state: ${error}`);
         terasliceStats.updateErrors('metrics');
     }
 
@@ -79,7 +79,7 @@ async function main() {
         try {
             await terasliceStats.update();
                     } catch (error) {
-            logger.error(`Error encountered getting terasliceStats: ${error}`);
+            logger.warn(`Error encountered getting terasliceStats: ${error}`);
             // TODO: record stats on the specific endpoint that had an error
             terasliceStats.updateErrors('stats');
             return;
@@ -87,7 +87,7 @@ async function main() {
         try {
             updateTerasliceMetrics(terasliceStats);
         } catch (error) {
-            logger.error(`Error processing Teraslice cluster state: ${error}`);
+            logger.warn(`Error processing Teraslice cluster state: ${error}`);
             terasliceStats.updateErrors('metrics');
             return;
         }
