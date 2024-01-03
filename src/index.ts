@@ -65,28 +65,30 @@ async function main() {
         await terasliceStats.update();
     } catch (error) {
         logger.error(`Error encountered getting terasliceStats: ${error}`);
-        process.exit(1);
+        terasliceStats.updateErrors('stats');
     }
     try {
         updateTerasliceMetrics(terasliceStats);
     } catch (error) {
         logger.error(`Error processing Teraslice cluster state: ${error}`);
-        process.exit(2);
+        terasliceStats.updateErrors('metrics');
     }
 
     setInterval(async () => {
         logger.info('Beginning update of Teraslice state');
         try {
             await terasliceStats.update();
-        } catch (error) {
+                    } catch (error) {
             logger.error(`Error encountered getting terasliceStats: ${error}`);
-            process.exit(1)
+            terasliceStats.updateErrors('stats');
+            return;
         }
         try {
             updateTerasliceMetrics(terasliceStats);
         } catch (error) {
             logger.error(`Error processing Teraslice cluster state: ${error}`);
-            process.exit(2);
+            terasliceStats.updateErrors('metrics');
+            return;
         }
 
         const datasetSizes = {
