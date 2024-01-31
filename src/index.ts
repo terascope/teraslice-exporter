@@ -78,7 +78,7 @@ async function main() {
         logger.info('Beginning update of Teraslice state');
         try {
             await terasliceStats.update();
-                    } catch (error) {
+        } catch (error) {
             logger.warn(`Error encountered getting terasliceStats: ${error}`);
             // TODO: record stats on the specific endpoint that had an error
             terasliceStats.updateErrors('stats');
