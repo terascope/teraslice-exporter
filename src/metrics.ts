@@ -434,8 +434,8 @@ function generateExecutionVersions(terasliceStats:TerasliceStats, labels:any) {
 }
 
 function generateExporterErrorStats(terasliceStats:TerasliceStats) {
-        gaugeTerasliceExporterErrors.set({'error_type': 'update_stats_errors' }, terasliceStats.errors.statsErrors);
-        gaugeTerasliceExporterErrors.set({'error_type': 'update_metrics_errors' }, terasliceStats.errors.metricsErrors);
+    gaugeTerasliceExporterErrors.set({'error_type': 'update_stats_errors' }, terasliceStats.errors.statsErrors);
+    gaugeTerasliceExporterErrors.set({'error_type': 'update_metrics_errors' }, terasliceStats.errors.metricsErrors);
 }
 
 export function updateTerasliceMetrics(terasliceStats: TerasliceStats): void {
