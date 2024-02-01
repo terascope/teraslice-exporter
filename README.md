@@ -46,7 +46,7 @@ value is in ms.
 Build the docker image:
 
 ```bash
-docker build -t teraslice-exporter:v0.1.0 .
+docker build -t teraslice-exporter:v0.4.0 .
 ```
 
 Run the docker image:
@@ -54,7 +54,7 @@ Run the docker image:
 ```bash
 docker run --rm -p 3000:3000 \
     -e TERASLICE_URL="http://url.to.teraslice/" \
-    teraslice-exporter:v0.1.0 | bunyan
+    teraslice-exporter:v0.4.0 | bunyan
 ```
 
 ## Design
