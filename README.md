@@ -1,5 +1,11 @@
 # Teraslice Job Exporter README
 
+NOTE: This exporter is EOL and no longer maintained.  As of the completion of
+https://github.com/terascope/teraslice/issues/3600 in Teraslice, an exporter is
+built into the Teraslice master.  Search the
+[Teraslice Documentation](https://terascope.github.io/teraslice/docs/configuration/overview/#terafoundation-configuration-reference)
+for `prom_metrics_enabled`.
+
 Note: This exporter is only meant for use with Teraslice using Kubernetes
 clustering.  It hasn't been tested with Teraslice running in Native clustering
 mode.
